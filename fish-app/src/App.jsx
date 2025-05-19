@@ -58,7 +58,9 @@ const slideImages = [
 const fishImg = '/fish.png';
 const coverImg = '/cover.png'; // 你可以替换为自己的封面图
 const slideBase = '/slides/';
-const fishMoveVideo = '/FISHMOVE.mp4';
+const fishMoveVideo1 = '/FISHMOVE1.mp4';
+const fishMoveVideo2 = '/FISHMOVE2.mp4';
+const fishMoveVideo3 = '/FISHMOVE3.mp4';
 
 const STATE = {
   INIT: 'init',
@@ -67,6 +69,13 @@ const STATE = {
   RESULT: 'result',
   RESET: 'reset',
 };
+
+// 艺术风格介绍映射
+const artDescriptions = {
+  "Russian Constructivism Fish": "俄罗斯构成主义（Russian Constructivism）是20世纪初起源于俄国的一场激进艺术与设计运动，强调艺术服务于社会革命和工业化目标，反对传统艺术的装饰性与个人主义，主张将艺术与技术、生产相结合，追求功能与形式统一。",
+  // 你可以继续补充其它图片名的介绍
+};
+const defaultDescription = "这是一种独特的艺术风格鱼，融合了艺术与想象力，展现了不止鱼此的美学追求。";
 
 function App() {
   const [showCover, setShowCover] = useState(true);
@@ -83,11 +92,22 @@ function App() {
   const [dragCount, setDragCount] = useState(0);
   const [lastDir, setLastDir] = useState(null);
   const isPressing = useRef(false);
+  const [videoType, setVideoType] = useState('none'); // 'none' | 'move1' | 'move2' | 'move3'
+  const clickTimer = useRef(null);
+  const clickCount = useRef(0);
+  const video1Ref = useRef(null);
+  const video2Ref = useRef(null);
+  const video3Ref = useRef(null);
 
   // 记录按下时间和位置
   const pressInfo = useRef({ time: 0, x: 0, y: 0, moved: false, timer: null });
   const MOVE_THRESHOLD = 15; // px
   const LONG_PRESS = 300; // ms
+
+  // 结果卡片渐隐控制
+  const [showResultCard, setShowResultCard] = useState(true);
+
+  const [musicOn, setMusicOn] = useState(false); // false: 静音, true: 有声
 
   // 首页封面点击，渐隐消失
   const handleCoverClick = () => {
@@ -95,14 +115,41 @@ function App() {
     setTimeout(() => setShowCover(false), 800); // 动画时长与css一致
   };
 
-  // 点击鱼图，播放视频
+  // 单击/双击/三击主图事件
   const handleFishClick = () => {
     if (state !== STATE.INIT) return;
-    setState(STATE.VIDEO);
+    clickCount.current += 1;
+    if (clickTimer.current) clearTimeout(clickTimer.current);
+    clickTimer.current = setTimeout(() => {
+      if (clickCount.current === 1) {
+        setVideoType('move1');
+        setState(STATE.VIDEO);
+        if (video1Ref.current) {
+          video1Ref.current.currentTime = 0;
+          video1Ref.current.play();
+        }
+      } else if (clickCount.current === 2) {
+        setVideoType('move2');
+        setState(STATE.VIDEO);
+        if (video2Ref.current) {
+          video2Ref.current.currentTime = 0;
+          video2Ref.current.play();
+        }
+      } else if (clickCount.current >= 3) {
+        setVideoType('move3');
+        setState(STATE.VIDEO);
+        if (video3Ref.current) {
+          video3Ref.current.currentTime = 0;
+          video3Ref.current.play();
+        }
+      }
+      clickCount.current = 0;
+    }, 250); // 250ms内统计点击次数
   };
 
   // 视频播放结束，回到主图
   const handleVideoEnd = () => {
+    setVideoType('none');
     setState(STATE.INIT);
   };
 
@@ -156,9 +203,9 @@ function App() {
     clearTimeout(pressInfo.current.timer);
     const duration = Date.now() - pressInfo.current.time;
     // 没有移动且时间短，判定为点击
-    if (!pressInfo.current.moved && duration < LONG_PRESS) {
-      setState(STATE.VIDEO);
-    }
+    // if (!pressInfo.current.moved && duration < LONG_PRESS) {
+    //   setState(STATE.VIDEO);
+    // }
   };
 
   // 轮播时松开，停止轮播
@@ -166,15 +213,10 @@ function App() {
     if (state === STATE.SLIDE) {
       if (animRef.current) clearInterval(animRef.current);
       setResultIdx(slideIdx);
+      setShowResultCard(true); // 进入结果页时重置卡片显示
       setState(STATE.RESULT);
       setShowResult(true);
       isPressing.current = false;
-      // 3秒后渐变回主图
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        setShowResult(false);
-        setTimeout(() => setState(STATE.INIT), 800); // 渐变动画时长
-      }, 3000);
     }
   };
 
@@ -186,11 +228,34 @@ function App() {
     }, slideSpeed);
   };
 
+  // GET按钮点击
+  const handleGetClick = () => {
+    setShowResultCard(false);
+    setTimeout(() => {
+      setShowResult(false);
+      setTimeout(() => setState(STATE.INIT), 800); // 渐变动画时长
+    }, 800); // 卡片渐隐动画时长
+  };
+
   // 渲染
   return (
     <div className="fish-app">
+      {/* 右上角信息栏 */}
+      <div className="info-bar">
+        <span className="info-item">3 TIMES</span>
+        <span className="info-sep">|</span>
+        <span
+          className={`info-item info-music${musicOn ? '' : ' muted'}`}
+          onClick={() => setMusicOn(m => !m)}
+          style={{ cursor: 'pointer', userSelect: 'none' }}
+        >
+          MUSIC
+        </span>
+        <span className="info-sep">|</span>
+        <span className="info-item">COLLCETION</span>
+      </div>
       {showCover && (
-        <div className={`cover${coverHide ? ' hide' : ''}`} onClick={handleCoverClick}>
+        <div className={`cover${coverHide ? ' hide' : ''}`} onClick={handleCoverClick} style={{ zIndex: 2 }}>
           <img
             src={coverImg}
             alt="封面"
@@ -199,39 +264,67 @@ function App() {
           />
         </div>
       )}
+      {state === STATE.INIT && (
+        <img
+          src={fishImg}
+          alt="鱼"
+          className="fish-img"
+          style={{ cursor: 'pointer', zIndex: 1, position: 'relative' }}
+          onMouseDown={handlePressStart}
+          onMouseMove={handlePressMove}
+          onMouseUp={handlePressEnd}
+          onMouseLeave={handlePressEnd}
+          onTouchStart={handlePressStart}
+          onTouchMove={handlePressMove}
+          onTouchEnd={handlePressEnd}
+          draggable={false}
+          onClick={handleFishClick}
+        />
+      )}
+      {/* 视频区域，三个video都渲染，display控制显示，提前加载 */}
+      <div className="video-placeholder" style={{ display: state === STATE.VIDEO ? 'block' : 'none' }}>
+        <video
+          ref={video1Ref}
+          src={fishMoveVideo1}
+          className="video-move"
+          width="100%"
+          height="auto"
+          autoPlay={videoType === 'move1'}
+          muted={!musicOn}
+          playsInline
+          preload="auto"
+          onEnded={handleVideoEnd}
+          style={{ display: videoType === 'move1' ? 'block' : 'none' }}
+        />
+        <video
+          ref={video2Ref}
+          src={fishMoveVideo2}
+          className="video-move"
+          width="100%"
+          height="auto"
+          autoPlay={videoType === 'move2'}
+          muted={!musicOn}
+          playsInline
+          preload="auto"
+          onEnded={handleVideoEnd}
+          style={{ display: videoType === 'move2' ? 'block' : 'none' }}
+        />
+        <video
+          ref={video3Ref}
+          src={fishMoveVideo3}
+          className="video-move"
+          width="100%"
+          height="auto"
+          autoPlay={videoType === 'move3'}
+          muted={!musicOn}
+          playsInline
+          preload="auto"
+          onEnded={handleVideoEnd}
+          style={{ display: videoType === 'move3' ? 'block' : 'none' }}
+        />
+      </div>
       {!showCover && (
         <>
-          {state === STATE.INIT && (
-            <img
-              src={fishImg}
-              alt="鱼"
-              className="fish-img"
-              style={{ cursor: 'pointer' }}
-              onMouseDown={handlePressStart}
-              onMouseMove={handlePressMove}
-              onMouseUp={handlePressEnd}
-              onMouseLeave={handlePressEnd}
-              onTouchStart={handlePressStart}
-              onTouchMove={handlePressMove}
-              onTouchEnd={handlePressEnd}
-              draggable={false}
-            />
-          )}
-          {state === STATE.VIDEO && (
-            <div className="video-placeholder">
-              <video
-                src={fishMoveVideo}
-                className="video-move"
-                width="100%"
-                height="auto"
-                autoPlay
-                muted
-                playsInline
-                onEnded={handleVideoEnd}
-                style={{ display: 'block' }}
-              />
-            </div>
-          )}
           {state === STATE.SLIDE && (
             <div
               className="slide-area"
@@ -256,8 +349,17 @@ function App() {
                 className="slide-img"
                 draggable={false}
               />
-              <div className="slide-title">{slideImages[resultIdx].replace(/\.png$/,'')}</div>
-              <div className="result-text">你，不止鱼此</div>
+              {/* 结果卡片 */}
+              <div className={`result-card${showResultCard ? '' : ' fadeout'}`}>
+                <div className="result-title">
+                  {slideImages[resultIdx].replace(/\.png$/,'').toUpperCase()}
+                </div>
+                <div className="result-desc">
+                  {artDescriptions[slideImages[resultIdx].replace(/\.png$/,'')] || defaultDescription}
+                </div>
+                <div className="result-text">你, 不止鱼此</div>
+                <button className="result-get-btn" onClick={handleGetClick}>GET</button>
+              </div>
             </div>
           )}
         </>
